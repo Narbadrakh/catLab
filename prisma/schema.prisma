@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Label {
+  CAT
+  NOT_CAT
+}
+
+model Photo {
+  id        Int      @id @default(autoincrement())
+  path      String
+  label     Label?
+  createdAt DateTime @default(now())
+}
+
+model TrainingRun {
+  id        Int      @id @default(autoincrement())
+  rounds    Int
+  accuracy  Float
+  createdAt DateTime @default(now())
+}
