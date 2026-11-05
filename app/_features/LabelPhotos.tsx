@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 import { PhotoTile } from "@/app/_components/PhotoTile";
 import { LabelButtons } from "@/app/_components/LabelButtons";
@@ -10,6 +10,10 @@ import { LockedButton } from "@/app/_components/LockedButton";
 
 export type Label = "Cat" | "Not cat";
 
+// Амжилттай хадгалсан зургуудыг (blob URL-аар) санана.
+// Component хаагдаад дахин нээгдэх (Back/Next) үед ч хадгалагдсан хэвээр байна.
+const savedImages = new Set<string>();
+
 type Props = {
   images: string[];
   labels: { [key: number]: Label };
@@ -19,6 +23,8 @@ type Props = {
 };
 
 export function LabelPhotos({ images, labels, onLabel, onBack, onNext }: Props) {
+  const [saving, setSaving] = useState(false);
+
   const catCount = Object.values(labels).filter((l) => l === "Cat").length;
   const notCatCount = Object.values(labels).filter((l) => l === "Not cat").length;
   const stillToLabel = images.length - Object.keys(labels).length;
@@ -26,10 +32,14 @@ export function LabelPhotos({ images, labels, onLabel, onBack, onNext }: Props) 
   // Rule: every photo has a label and both groups have at least 1.
   const canContinue = stillToLabel === 0 && catCount >= 1 && notCatCount >= 1;
 
-  // Зураг бүрийг манай API руу илгээж хадгалаад дараагийн алхам руу шилжих
+  // Хадгалаагүй зургуудыг л манай API руу илгээж, дараагийн алхам руу шилжих
   const handleNextWithSupabase = async () => {
+    if (saving) return; // давхар дарахаас сэргийлнэ
+    setSaving(true);
     try {
       for (let i = 0; i < images.length; i++) {
+        if (savedImages.has(images[i])) continue; // аль хэдийн хадгалсан
+
         const blob = await (await fetch(images[i])).blob();
         const ext = blob.type.split("/")[1] || "jpg";
         const file = new File([blob], `photo-${i}.${ext}`, { type: blob.type });
@@ -43,12 +53,16 @@ export function LabelPhotos({ images, labels, onLabel, onBack, onNext }: Props) 
           const data = await res.json().catch(() => ({}));
           console.error("Хадгалахад алдаа гарлаа:", data);
           alert("Хадгалахад алдаа гарлаа. Console-оо шалгаарай.");
+          setSaving(false);
           return; // алдаа гарвал дараагийн алхам руу шилжихгүй
         }
+
+        savedImages.add(images[i]); // амжилттай болсон үед л тэмдэглэнэ
       }
       onNext();
     } catch (err) {
       console.error("Хадгалахад алдаа гарлаа:", err);
+      setSaving(false);
     }
   };
 
@@ -93,7 +107,13 @@ export function LabelPhotos({ images, labels, onLabel, onBack, onNext }: Props) 
       <div className="flex justify-between items-center mt-4">
         <BackButton onClick={onBack} />
         {canContinue ? (
-          <MainButton onClick={handleNextWithSupabase}>Next: Train Model</MainButton>
+          saving ? (
+            <div className="w-72">
+              <LockedButton>Saving photos...</LockedButton>
+            </div>
+          ) : (
+            <MainButton onClick={handleNextWithSupabase}>Next: Train Model</MainButton>
+          )
         ) : (
           <div className="w-72">
             <LockedButton>
